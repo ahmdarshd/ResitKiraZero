@@ -215,8 +215,17 @@ input, select {
 .btn-ghost { background: none; color: var(--ink); }
 
 /* ---------- Ledger ---------- */
-.ledger-summary { margin-bottom: 0.9rem; font-size: 0.85rem; color: var(--ink-soft); }
+.ledger-summary { margin-bottom: 0.9rem; font-size: 0.85rem; color: var(--ink-soft); display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; flex-wrap: wrap; }
 .ledger-summary select { display: inline-block; width: auto; margin-left: 0.4rem; }
+.btn-export {
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--ink);
+  background: var(--paper-raised);
+  color: var(--ink);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
 .ledger-list { display: flex; flex-direction: column; gap: 0.7rem; }
 
 .ledger-cat {
@@ -250,7 +259,7 @@ input, select {
   font-size: 0.83rem;
 }
 .ledger-receipt-row:last-child { border-bottom: none; }
-.ledger-receipt-row img { width: 36px; height: 36px; object-fit: cover; border-radius: 4px; }
+.ledger-receipt-row img { width: 36px; height: 36px; object-fit: cover; border-radius: 4px; cursor: pointer; }
 .ledger-receipt-row .info { flex: 1; }
 .ledger-receipt-row .info strong { display: block; }
 .ledger-receipt-row .unconfirmed { color: var(--gold); font-size: 0.72rem; }
