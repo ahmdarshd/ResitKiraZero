@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#16302B" />
+<title>ResitKira — LHDN Relief Ledger</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">RK</span>
+    <div class="brand-text">
+      <h1>ResitKira</h1>
+      <p>LHDN relief ledger</p>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span id="netStatus" class="net-badge">checking…</span>
+    <button id="settingsBtn" class="icon-btn" title="Settings" aria-label="Settings">⚙</button>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="tab-btn active" data-view="capture">Capture</button>
+  <button class="tab-btn" data-view="ledger">Ledger</button>
+  <button class="tab-btn" data-view="settings">Settings</button>
+</nav>
+
+<main>
+
+  <!-- CAPTURE VIEW -->
+  <section id="view-capture" class="view active">
+    <div class="capture-card">
+      <p class="capture-hint">Photograph a receipt. It'll be read, matched against the current LHDN relief list, and filed — into every category it qualifies for.</p>
+      <label class="capture-drop" for="fileInput">
+        <span class="capture-drop-icon">📷</span>
+        <span>Tap to take a photo or choose an image</span>
+        <input type="file" id="fileInput" accept="image/*" capture="environment" hidden />
+      </label>
+      <div id="captureStatus" class="capture-status" hidden></div>
+    </div>
+
+    <div id="recentList" class="recent-list"></div>
+  </section>
+
+  <!-- REVIEW MODAL -->
+  <section id="reviewModal" class="modal" hidden>
+    <div class="modal-sheet">
+      <h2>Confirm receipt</h2>
+      <img id="reviewImg" class="review-img" alt="Captured receipt" />
+      <div class="field-row">
+        <label>Merchant<input id="reviewMerchant" type="text" /></label>
+        <label>Date<input id="reviewDate" type="date" /></label>
+      </div>
+      <label class="field-full">Amount (RM)<input id="reviewAmount" type="number" step="0.01" /></label>
+
+      <p class="section-label">Matched categories — tick all that apply</p>
+      <div id="reviewCategories" class="review-categories"></div>
+
+      <p id="reviewSourceNote" class="source-note"></p>
+
+      <div class="modal-actions">
+        <button id="reviewCancel" class="btn-ghost">Discard</button>
+        <button id="reviewSave" class="btn-primary">Save to ledger</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- LEDGER VIEW -->
+  <section id="view-ledger" class="view">
+    <div class="ledger-summary">
+      <label>Assessment year
+        <select id="yearFilter"></select>
+      </label>
+    </div>
+    <div id="ledgerList" class="ledger-list"></div>
+  </section>
+
+  <!-- SETTINGS VIEW -->
+  <section id="view-settings" class="view">
+    <div class="settings-card">
+      <h2>Gemini (online categorization)</h2>
+      <p class="settings-note">Used only when the device is online. Your key stays on this device and is sent directly to Google — there is no server in between.</p>
+      <label class="field-full">Gemini API key<input id="geminiKey" type="password" autocomplete="off" /></label>
+      <label class="field-full">Model id
+        <input id="geminiModel" type="text" placeholder="gemini-2.5-flash" />
+      </label>
+      <p class="settings-note">Google renames/retires model ids periodically. If requests start failing with a 404, check <span class="mono">aistudio.google.com</span> for the current model id and update it here.</p>
+    </div>
+
+    <div class="settings-card">
+      <h2>LHDN relief list</h2>
+      <p class="settings-note">Bundled version: <span id="bundledVersion" class="mono"></span></p>
+      <p class="settings-note" id="refreshedInfo">Not refreshed from an online source yet.</p>
+      <label class="field-full">Refresh URL (a JSON file you host and update each tax year)
+        <input id="refreshUrl" type="url" placeholder="https://example.com/lhdn-relief-2026.json" />
+      </label>
+      <button id="refreshNowBtn" class="btn-primary">Refresh now</button>
+    </div>
+
+    <div class="settings-card">
+      <h2>Data</h2>
+      <p class="settings-note">Everything is stored locally on this device (IndexedDB). Nothing is uploaded except the receipt image sent to Gemini when you're online and a key is set.</p>
+    </div>
+  </section>
+
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.0/tesseract.min.js"></script>
+<script src="lhdn-data.js"></script>
+<script src="db.js"></script>
+<script src="gemini.js"></script>
+<script src="offline-engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
