@@ -32,6 +32,8 @@ function wireEvents() {
   document.getElementById("refreshNowBtn").addEventListener("click", refreshLhdnList);
 
   document.getElementById("yearFilter").addEventListener("change", renderLedger);
+  document.getElementById("exportCsvBtn").addEventListener("click", exportLedgerCsv);
+  document.getElementById("viewerClose").addEventListener("click", closeImageViewer);
 }
 
 function switchView(name) {
@@ -271,18 +273,23 @@ async function renderLedger() {
     for (const r of group.receipts.sort((a, b) => (b.date || "").localeCompare(a.date || ""))) {
       const row = document.createElement("div");
       row.className = "ledger-receipt-row";
-      const img = document.createElement("img");
-      Db.getImage(r.groupId).then(blob => { if (blob) img.src = URL.createObjectURL(blob); });
-      row.appendChild(img);
-      row.innerHTML += `
+      row.innerHTML = `
+        <img class="thumb" alt="Receipt photo" />
         <div class="info">
-          <strong>${r.merchant || "Unknown merchant"}</strong>
+          <strong>${escapeHtml(r.merchant || "Unknown merchant")}</strong>
           <span>${r.date || ""} · RM ${(r.amount || 0).toFixed(2)}</span>
           ${!r.confirmed ? '<span class="unconfirmed">unconfirmed — from offline OCR</span>' : ""}
         </div>
-        <button data-id="${r.id}">Remove</button>
+        <button class="remove-btn" data-id="${r.id}">Remove</button>
       `;
-      row.querySelector("button").addEventListener("click", async (ev) => {
+      const imgEl = row.querySelector("img.thumb");
+      Db.getImage(r.groupId).then(blob => {
+        if (blob) imgEl.src = URL.createObjectURL(blob);
+      });
+      imgEl.addEventListener("click", () => {
+        if (imgEl.src) openImageViewer(imgEl.src, r);
+      });
+      row.querySelector(".remove-btn").addEventListener("click", async (ev) => {
         ev.stopPropagation();
         await Db.deleteReceiptRecord(r.id);
         renderLedger();
@@ -294,6 +301,70 @@ async function renderLedger() {
   }
 }
 
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// ---------- Image viewer ----------
+function openImageViewer(src, receipt) {
+  document.getElementById("viewerImg").src = src;
+  document.getElementById("viewerCaption").textContent =
+    `${receipt.merchant || "Unknown merchant"} · ${receipt.date || ""} · RM ${(receipt.amount || 0).toFixed(2)} · ${receipt.categoryLabel || ""}`;
+  document.getElementById("viewerDownload").onclick = () => {
+    const a = document.createElement("a");
+    a.href = src;
+    const safeName = (receipt.merchant || "receipt").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+    a.download = `${safeName || "receipt"}-${receipt.date || "undated"}.jpg`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+  document.getElementById("imageViewerModal").hidden = false;
+}
+
+function closeImageViewer() {
+  document.getElementById("imageViewerModal").hidden = true;
+}
+
+// ---------- CSV export ----------
+async function exportLedgerCsv() {
+  const all = await Db.getAllReceipts();
+  const yearSelect = document.getElementById("yearFilter");
+  const selectedYear = parseInt(yearSelect.value, 10);
+  const rows = all.filter(r => r.year === selectedYear);
+
+  if (!rows.length) {
+    alert(`No receipts to export for ${selectedYear}.`);
+    return;
+  }
+
+  const header = ["Category", "Merchant", "Date", "Amount (RM)", "Confirmed", "Notes"];
+  const csvRows = rows
+    .sort((a, b) => (a.categoryLabel || "").localeCompare(b.categoryLabel || "") || (a.date || "").localeCompare(b.date || ""))
+    .map(r => [
+      r.categoryLabel || r.categoryId,
+      r.merchant || "Unknown merchant",
+      r.date || "",
+      (r.amount || 0).toFixed(2),
+      r.confirmed ? "Yes" : "Unconfirmed (offline OCR)",
+      (r.matchedKeywords || []).join("; ")
+    ]);
+
+  const csvContent = [header, ...csvRows]
+    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+    .join("\r\n");
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `resitkira-relief-ledger-${selectedYear}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 // ---------- Service worker ----------
 function registerServiceWorker() {
   if ("serviceWorker" in navigator) {
@@ -301,4 +372,5 @@ function registerServiceWorker() {
       // Non-fatal — app still works online, just won't be installable/offline-cached.
     });
   }
-}
+        }
+  
