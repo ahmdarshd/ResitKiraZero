@@ -76,8 +76,22 @@
       <label>Assessment year
         <select id="yearFilter"></select>
       </label>
+      <button id="exportCsvBtn" class="btn-export">Export as CSV</button>
     </div>
     <div id="ledgerList" class="ledger-list"></div>
+  </section>
+
+  <!-- IMAGE VIEWER MODAL -->
+  <section id="imageViewerModal" class="modal" hidden>
+    <div class="modal-sheet">
+      <h2>Receipt</h2>
+      <img id="viewerImg" class="review-img" alt="Full-size receipt" />
+      <p id="viewerCaption" class="source-note"></p>
+      <div class="modal-actions">
+        <button id="viewerClose" class="btn-ghost">Close</button>
+        <button id="viewerDownload" class="btn-primary">Download image</button>
+      </div>
+    </div>
   </section>
 
   <!-- SETTINGS VIEW -->
@@ -117,4 +131,5 @@
 <script src="offline-engine.js"></script>
 <script src="app.js"></script>
 </body>
-</html>
+                                                </html>
+                                                
