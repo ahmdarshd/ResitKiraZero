@@ -33,6 +33,7 @@ function wireEvents() {
 
   document.getElementById("yearFilter").addEventListener("change", renderLedger);
   document.getElementById("exportCsvBtn").addEventListener("click", exportLedgerCsv);
+  document.getElementById("exportZipBtn").addEventListener("click", exportReceiptsZip);
   document.getElementById("viewerClose").addEventListener("click", closeImageViewer);
 }
 
@@ -163,16 +164,26 @@ function openReviewModal({ imageBlob, merchant, date, amount, matches, sourceTex
   if (!matches.length) {
     wrap.innerHTML = `<p class="empty-note">No LHDN category matched automatically. You can still save it as uncategorized, or check the receipt manually.</p>`;
   }
+  const splitDefault = (amount && matches.length) ? (amount / matches.length).toFixed(2) : "";
   matches.forEach((m, i) => {
     const row = document.createElement("label");
     row.className = "cat-option";
     row.innerHTML = `
       <input type="checkbox" data-idx="${i}" checked />
-      <span>${m.label}</span>
-      <span class="conf">${Math.round((m.confidence || 0) * 100)}% match</span>
+      <span class="cat-option-label">
+        <span>${m.label}</span>
+        <span class="conf">${Math.round((m.confidence || 0) * 100)}% match${m.matchedKeywords && m.matchedKeywords.length ? " — " + escapeHtml(m.matchedKeywords[0]) : ""}</span>
+      </span>
+      <input type="number" step="0.01" class="cat-amount" data-idx="${i}" value="${splitDefault}" placeholder="RM" />
     `;
     wrap.appendChild(row);
   });
+  if (matches.length > 1) {
+    const hint = document.createElement("p");
+    hint.className = "source-note";
+    hint.textContent = "Multiple categories matched — the amount is split evenly as a starting point. Edit each field to reflect what was actually spent per category.";
+    wrap.appendChild(hint);
+  }
 
   document.getElementById("reviewSourceNote").textContent = viaGemini
     ? "Read via Gemini."
@@ -191,10 +202,15 @@ async function saveReviewedReceipt() {
   const merchant = document.getElementById("reviewMerchant").value.trim();
   const date = document.getElementById("reviewDate").value;
   const amountRaw = document.getElementById("reviewAmount").value;
-  const amount = amountRaw ? parseFloat(amountRaw) : null;
+  const totalAmount = amountRaw ? parseFloat(amountRaw) : null;
 
-  const checked = [...document.querySelectorAll("#reviewCategories input[type=checkbox]:checked")]
-    .map(cb => pendingReview.matches[parseInt(cb.dataset.idx, 10)]);
+  const checkedRows = [...document.querySelectorAll("#reviewCategories input[type=checkbox]:checked")];
+  const checked = checkedRows.map(cb => {
+    const idx = parseInt(cb.dataset.idx, 10);
+    const amountInput = document.querySelector(`#reviewCategories input.cat-amount[data-idx="${idx}"]`);
+    const catAmount = amountInput && amountInput.value ? parseFloat(amountInput.value) : totalAmount;
+    return { ...pendingReview.matches[idx], amount: catAmount };
+  });
 
   const year = date ? new Date(date).getFullYear() : new Date().getFullYear();
 
@@ -202,7 +218,7 @@ async function saveReviewedReceipt() {
     imageBlob: pendingReview.imageBlob,
     merchant,
     date,
-    amount,
+    amount: totalAmount,
     year,
     categories: checked,
     confirmed: true
@@ -327,17 +343,7 @@ function closeImageViewer() {
 }
 
 // ---------- CSV export ----------
-async function exportLedgerCsv() {
-  const all = await Db.getAllReceipts();
-  const yearSelect = document.getElementById("yearFilter");
-  const selectedYear = parseInt(yearSelect.value, 10);
-  const rows = all.filter(r => r.year === selectedYear);
-
-  if (!rows.length) {
-    alert(`No receipts to export for ${selectedYear}.`);
-    return;
-  }
-
+function buildCsvContent(rows) {
   const header = ["Category", "Merchant", "Date", "Amount (RM)", "Confirmed", "Notes"];
   const csvRows = rows
     .sort((a, b) => (a.categoryLabel || "").localeCompare(b.categoryLabel || "") || (a.date || "").localeCompare(b.date || ""))
@@ -349,11 +355,27 @@ async function exportLedgerCsv() {
       r.confirmed ? "Yes" : "Unconfirmed (offline OCR)",
       (r.matchedKeywords || []).join("; ")
     ]);
-
-  const csvContent = [header, ...csvRows]
+  return [header, ...csvRows]
     .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
     .join("\r\n");
+}
 
+function sanitizeFileName(str) {
+  return String(str).replace(/[^a-z0-9]+/gi, "-").toLowerCase().replace(/^-+|-+$/g, "") || "unnamed";
+}
+
+async function exportLedgerCsv() {
+  const all = await Db.getAllReceipts();
+  const yearSelect = document.getElementById("yearFilter");
+  const selectedYear = parseInt(yearSelect.value, 10);
+  const rows = all.filter(r => r.year === selectedYear);
+
+  if (!rows.length) {
+    alert(`No receipts to export for ${selectedYear}.`);
+    return;
+  }
+
+  const csvContent = buildCsvContent(rows);
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -365,6 +387,70 @@ async function exportLedgerCsv() {
   URL.revokeObjectURL(url);
 }
 
+// ---------- ZIP export (all receipt images, one folder per category) ----------
+async function exportReceiptsZip() {
+  const btn = document.getElementById("exportZipBtn");
+  const yearSelect = document.getElementById("yearFilter");
+  const selectedYear = parseInt(yearSelect.value, 10);
+
+  const all = await Db.getAllReceipts();
+  const rows = all.filter(r => r.year === selectedYear);
+
+  if (!rows.length) {
+    alert(`No receipts to zip for ${selectedYear}.`);
+    return;
+  }
+  if (typeof JSZip === "undefined") {
+    alert("The zip library hasn't loaded yet — check your connection and try again in a moment (it only needs to load once, then it's cached for offline use).");
+    return;
+  }
+
+  btn.disabled = true;
+  const originalLabel = btn.textContent;
+
+  try {
+    const zip = new JSZip();
+    // Track how many times a filename has been used within a folder so duplicates don't overwrite each other.
+    const nameCounts = new Map();
+
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      btn.textContent = `Zipping ${i + 1}/${rows.length}…`;
+
+      const blob = await Db.getImage(r.groupId);
+      if (!blob) continue;
+
+      const folderName = sanitizeFileName(r.categoryLabel || r.categoryId || "uncategorized");
+      const ext = (blob.type && blob.type.includes("png")) ? "png" : "jpg";
+      let baseName = `${sanitizeFileName(r.merchant)}-${r.date || "undated"}`;
+      const countKey = `${folderName}/${baseName}`;
+      const count = nameCounts.get(countKey) || 0;
+      nameCounts.set(countKey, count + 1);
+      const fileName = count === 0 ? `${baseName}.${ext}` : `${baseName}-${count + 1}.${ext}`;
+
+      zip.folder(folderName).file(fileName, blob);
+    }
+
+    zip.file(`summary-${selectedYear}.csv`, buildCsvContent(rows));
+
+    btn.textContent = "Compressing…";
+    const zipBlob = await zip.generateAsync({ type: "blob" });
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `resitkira-receipts-${selectedYear}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert("Couldn't build the zip: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
+}
+
 // ---------- Service worker ----------
 function registerServiceWorker() {
   if ("serviceWorker" in navigator) {
@@ -372,5 +458,5 @@ function registerServiceWorker() {
       // Non-fatal — app still works online, just won't be installable/offline-cached.
     });
   }
-        }
-  
+    }
+        
