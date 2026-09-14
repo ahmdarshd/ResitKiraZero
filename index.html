@@ -118,6 +118,18 @@
     </div>
 
     <div class="settings-card">
+      <h2>Backup & restore</h2>
+      <p class="settings-note">Your receipts live only in this browser's storage. Clearing cookies/site data, switching phones, or uninstalling Chrome will erase them — always back up first if you're about to do any of that.</p>
+      <button id="backupAllBtn" class="btn-primary" style="margin-bottom:0.7rem;">Back up everything (ZIP)</button>
+      <p class="settings-note">Downloads every receipt across all years, sorted into category folders, with a manifest that lets this app restore it exactly.</p>
+      <label class="btn-ghost" for="restoreZipInput" id="restoreZipBtn" style="display:block;text-align:center;cursor:pointer;">
+        Restore from ZIP backup
+        <input type="file" id="restoreZipInput" accept=".zip" hidden />
+      </label>
+      <p class="settings-note">Only restores zips created by this app's backup button (it needs the manifest.json inside). Records already in your ledger are skipped, so restoring the same backup twice won't duplicate anything.</p>
+    </div>
+
+    <div class="settings-card">
       <h2>Data</h2>
       <p class="settings-note">Everything is stored locally on this device (IndexedDB). Nothing is uploaded except the receipt image sent to Gemini when you're online and a key is set.</p>
     </div>
