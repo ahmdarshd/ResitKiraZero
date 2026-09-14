@@ -492,4 +492,52 @@ async function importReceiptsZip(file) {
     const zip = await JSZip.loadAsync(file);
     const manifestFile = zip.file("manifest.json");
     if (!manifestFile) {
-      alert("This zip doesn't have a manifest.json, so it wasn't exported by this app (or is from a version bef
+      alert("This zip doesn't have a manifest.json, so it wasn't exported by this app (or is from a version before backup/restore existed) — it can't be restored automatically.");
+      return;
+    }
+    const manifest = JSON.parse(await manifestFile.async("string"));
+
+    const existing = await Db.getAllReceipts();
+    const existingKeys = new Set(existing.map(r => `${r.groupId}|${r.categoryId}`));
+
+    let restored = 0, skipped = 0, missing = 0;
+    for (const entry of manifest) {
+      const key = `${entry.groupId}|${entry.categoryId}`;
+      if (existingKeys.has(key)) { skipped++; continue; }
+
+      const imgFile = zip.file(entry.zipPath);
+      let blob = null;
+      if (imgFile) {
+        const arrBuf = await imgFile.async("arraybuffer");
+        const mime = entry.zipPath.toLowerCase().endsWith(".png") ? "image/png" : "image/jpeg";
+        blob = new Blob([arrBuf], { type: mime });
+      } else {
+        missing++;
+      }
+
+      await Db.restoreReceiptRecord(entry, blob);
+      existingKeys.add(key);
+      restored++;
+    }
+
+    let msg = `Restored ${restored} receipt record(s).`;
+    if (skipped) msg += ` Skipped ${skipped} already in your ledger.`;
+    if (missing) msg += ` ${missing} record(s) had no matching image in this zip.`;
+    alert(msg);
+    renderLedger();
+  } catch (e) {
+    alert("Couldn't restore this backup: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
+}
+
+// ---------- Service worker ----------
+function registerServiceWorker() {
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js").catch(() => {
+      // Non-fatal — app still works online, just won't be installable/offline-cached.
+    });
+  }
+}
