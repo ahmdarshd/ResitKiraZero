@@ -33,7 +33,13 @@ function wireEvents() {
 
   document.getElementById("yearFilter").addEventListener("change", renderLedger);
   document.getElementById("exportCsvBtn").addEventListener("click", exportLedgerCsv);
-  document.getElementById("exportZipBtn").addEventListener("click", exportReceiptsZip);
+  document.getElementById("exportZipBtn").addEventListener("click", (e) => exportReceiptsZip(false, e.target));
+  document.getElementById("backupAllBtn").addEventListener("click", (e) => exportReceiptsZip(true, e.target));
+  document.getElementById("restoreZipInput").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (file) importReceiptsZip(file);
+  });
   document.getElementById("viewerClose").addEventListener("click", closeImageViewer);
 }
 
@@ -388,16 +394,16 @@ async function exportLedgerCsv() {
 }
 
 // ---------- ZIP export (all receipt images, one folder per category) ----------
-async function exportReceiptsZip() {
-  const btn = document.getElementById("exportZipBtn");
+async function exportReceiptsZip(allYears = false, triggerBtn = null) {
+  const btn = triggerBtn || document.getElementById("exportZipBtn");
   const yearSelect = document.getElementById("yearFilter");
   const selectedYear = parseInt(yearSelect.value, 10);
 
   const all = await Db.getAllReceipts();
-  const rows = all.filter(r => r.year === selectedYear);
+  const rows = allYears ? all : all.filter(r => r.year === selectedYear);
 
   if (!rows.length) {
-    alert(`No receipts to zip for ${selectedYear}.`);
+    alert(allYears ? "No receipts saved yet — nothing to back up." : `No receipts to zip for ${selectedYear}.`);
     return;
   }
   if (typeof JSZip === "undefined") {
@@ -410,6 +416,7 @@ async function exportReceiptsZip() {
 
   try {
     const zip = new JSZip();
+    const manifest = [];
     // Track how many times a filename has been used within a folder so duplicates don't overwrite each other.
     const nameCounts = new Map();
 
@@ -420,25 +427,44 @@ async function exportReceiptsZip() {
       const blob = await Db.getImage(r.groupId);
       if (!blob) continue;
 
-      const folderName = sanitizeFileName(r.categoryLabel || r.categoryId || "uncategorized");
+      const catFolder = sanitizeFileName(r.categoryLabel || r.categoryId || "uncategorized");
+      const folderName = allYears ? `${r.year}/${catFolder}` : catFolder;
       const ext = (blob.type && blob.type.includes("png")) ? "png" : "jpg";
       let baseName = `${sanitizeFileName(r.merchant)}-${r.date || "undated"}`;
       const countKey = `${folderName}/${baseName}`;
       const count = nameCounts.get(countKey) || 0;
       nameCounts.set(countKey, count + 1);
       const fileName = count === 0 ? `${baseName}.${ext}` : `${baseName}-${count + 1}.${ext}`;
+      const zipPath = `${folderName}/${fileName}`;
 
       zip.folder(folderName).file(fileName, blob);
+      manifest.push({
+        zipPath,
+        groupId: r.groupId,
+        categoryId: r.categoryId,
+        categoryLabel: r.categoryLabel,
+        merchant: r.merchant,
+        date: r.date,
+        amount: r.amount,
+        year: r.year,
+        confirmed: r.confirmed,
+        matchedKeywords: r.matchedKeywords || [],
+        sourceText: r.sourceText || ""
+      });
     }
 
-    zip.file(`summary-${selectedYear}.csv`, buildCsvContent(rows));
+    const label = allYears ? "all-years" : String(selectedYear);
+    zip.file(`summary-${label}.csv`, buildCsvContent(rows));
+    zip.file("manifest.json", JSON.stringify(manifest, null, 2));
 
     btn.textContent = "Compressing…";
     const zipBlob = await zip.generateAsync({ type: "blob" });
     const url = URL.createObjectURL(zipBlob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `resitkira-receipts-${selectedYear}.zip`;
+    a.download = allYears
+      ? `resitkira-full-backup-${new Date().toISOString().slice(0, 10)}.zip`
+      : `resitkira-receipts-${selectedYear}.zip`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -451,12 +477,19 @@ async function exportReceiptsZip() {
   }
 }
 
-// ---------- Service worker ----------
-function registerServiceWorker() {
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js").catch(() => {
-      // Non-fatal — app still works online, just won't be installable/offline-cached.
-    });
+// ---------- ZIP import (restore a previous backup) ----------
+async function importReceiptsZip(file) {
+  const btn = document.getElementById("restoreZipBtn");
+  if (typeof JSZip === "undefined") {
+    alert("The zip library hasn't loaded yet — check your connection and try again in a moment.");
+    return;
   }
-    }
-        
+  btn.disabled = true;
+  const originalLabel = btn.textContent;
+  btn.textContent = "Restoring…";
+
+  try {
+    const zip = await JSZip.loadAsync(file);
+    const manifestFile = zip.file("manifest.json");
+    if (!manifestFile) {
+      alert("This zip doesn't have a manifest.json, so it wasn't exported by this app (or is from a version bef
