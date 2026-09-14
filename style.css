@@ -199,7 +199,9 @@ input, select {
   padding: 0.5rem 0.6rem;
   font-size: 0.85rem;
 }
-.cat-option .conf { margin-left: auto; font-size: 0.72rem; color: var(--ink-soft); }
+.cat-option-label { display: flex; flex-direction: column; flex: 1; gap: 0.1rem; }
+.cat-option .conf { font-size: 0.72rem; color: var(--ink-soft); }
+.cat-option input.cat-amount { width: 5.2rem; margin: 0; padding: 0.35rem 0.4rem; font-size: 0.85rem; }
 .source-note { font-size: 0.72rem; color: var(--ink-soft); font-style: italic; }
 .modal-actions { display: flex; gap: 0.6rem; margin-top: 1rem; }
 
@@ -218,14 +220,15 @@ input, select {
 .ledger-summary { margin-bottom: 0.9rem; font-size: 0.85rem; color: var(--ink-soft); display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; flex-wrap: wrap; }
 .ledger-summary select { display: inline-block; width: auto; margin-left: 0.4rem; }
 .btn-export {
-  padding: 0.45rem 0.8rem;
+  padding: 0.45rem 0.7rem;
   border: 1px solid var(--ink);
   background: var(--paper-raised);
   color: var(--ink);
   border-radius: 6px;
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   cursor: pointer;
 }
+.btn-export:disabled { opacity: 0.6; }
 .ledger-list { display: flex; flex-direction: column; gap: 0.7rem; }
 
 .ledger-cat {
