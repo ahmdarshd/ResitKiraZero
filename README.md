@@ -43,6 +43,26 @@ when you have connectivity.
    sent anywhere except directly to Google's API. Don't hand this build of
    the app (with your key already typed in) to anyone else.
 
+## Backing up before you clear cookies/site data
+
+Your receipts and images live only in this browser's local storage
+(IndexedDB) — nothing is on a server. That means clearing cookies/site data,
+switching phones, reinstalling Chrome, or uninstalling the app will erase
+your ledger with no way to recover it. Before doing any of that:
+
+1. Settings → **"Back up everything (ZIP)"** — downloads every receipt
+   across all years into a zip, sorted into category folders, with a
+   `manifest.json` the app uses to restore precisely.
+2. After clearing data (or on a new phone), open the app again, go to
+   Settings → **"Restore from ZIP backup"**, and pick that zip file.
+3. Records already in your ledger are skipped on restore, so restoring the
+   same backup twice is safe and won't duplicate anything.
+
+Only zips produced by this app's own backup button can be restored
+automatically (they need the manifest.json inside) — a hand-built zip, or
+one from a version of the app before backup/restore existed, will be
+rejected.
+
 ## Keeping the relief list current
 
 The app ships with a YA2025 relief category list baked in
@@ -70,3 +90,4 @@ The app ships with a YA2025 relief category list baked in
   to split a single receipt's *items* across categories (e.g. RM50 of it is
   books, RM30 is sports gear), you'll need to enter those as two manual
   amounts rather than the app parsing individual line totals.
+  
