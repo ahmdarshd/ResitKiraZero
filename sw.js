@@ -1,4 +1,4 @@
-const CACHE_NAME = "resitkira-v7";
+const CACHE_NAME = "resitkira-v8";
 const APP_SHELL = [
   "./",
   "./index.html",
