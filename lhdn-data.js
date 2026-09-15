@@ -7,7 +7,7 @@
  * version / lastUpdated let the app tell a bundled copy apart from one
  * fetched from REFRESH_URL at runtime.
  */
-const LHDN_DATA_VERSION = "YA2025-2026-09-13";
+const LHDN_DATA_VERSION = "YA2025-2026-09-14-verified-against-hasil.gov.my";
 
 const DEFAULT_LHDN_CATEGORIES = [
   {
@@ -20,7 +20,6 @@ const DEFAULT_LHDN_CATEGORIES = [
       "newspaper", "surat khabar", "journal",
       "smartphone", "tablet", "laptop", "computer", "desktop pc", "phone",
       "internet", "broadband", "wifi", "unifi", "streaming subscription",
-      "gym", "sport shoe", "sukan",
       "skill course", "professional course", "self development",
       "printer", "webcam", "keyboard", "mouse", "monitor"
     ]
@@ -118,6 +117,19 @@ const DEFAULT_LHDN_CATEGORIES = [
     keywords: [
       "epf", "kwsp", "life insurance premium", "takaful premium",
       "insurans hayat"
+    ]
+  },
+  {
+    id: "prs_annuity",
+    label: "PRS (Private Retirement Scheme) & deferred annuity",
+    cap: 3000,
+    capNote: "RM3,000 cap, separate from the EPF/life insurance RM7,000 relief",
+    keywords: [
+      "prs", "private retirement scheme", "skim persaraan swasta",
+      "deferred annuity", "anuiti tertangguh", "anuiti tertunda",
+      "prs contribution", "principal prs", "public mutual prs",
+      "amInvest prs", "cimb prs", "affin hwang prs", "kenanga prs",
+      "manulife prs", "rhb prs"
     ]
   }
 ];
